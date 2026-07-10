@@ -1659,7 +1659,7 @@ function NavBar({ onAdminClick, content }: { onAdminClick: () => void; content: 
           </span>
         </a>
 
-        <div className="hidden md:flex items-center gap-8">
+        <div className="hidden md:flex items-center gap-6">
           {NAV_LINKS.map((l) => (
             <a key={l.label} href={l.href} className="text-sm font-medium transition-colors duration-200"
               style={{ fontFamily: "'Inter', sans-serif", color: "#5e7499" }}
@@ -1668,6 +1668,8 @@ function NavBar({ onAdminClick, content }: { onAdminClick: () => void; content: 
               {l.label}
             </a>
           ))}
+          {/* Google Custom Search */}
+          <div className="gcse-search" style={{ width: "200px" }}></div>
           <a href="#contact" className="px-5 py-2 text-sm font-semibold transition-all duration-200"
             style={{ background: "#00e5ff", color: "#070b13", borderRadius: "2px", fontFamily: "'Barlow', sans-serif" }}
             onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "#33ecff"; }}
