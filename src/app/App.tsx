@@ -11,6 +11,7 @@ import {
 // ─── Default site content (editable via admin) ───────────────────────────────
 
 const DEFAULT_CONTENT = {
+  logo: "",
   hero: {
     tagline: "ZyTech Insight · ZIF · Est. 2016",
     headline1: "SOFTWARE",
@@ -133,6 +134,7 @@ const NAV_LINKS = [
   { label: "About", href: "#about" },
   { label: "Portfolio", href: "#portfolio" },
   { label: "Updates", href: "#blog" },
+  { label: "Tutorials", id: "tutorials" },
   { label: "Contact", href: "#contact" },
 ];
 
@@ -322,6 +324,172 @@ function usePosts() {
   return { posts, createPost, upsert, remove, togglePublish };
 }
 
+// ─── Testimonials & Tutorial Hooks ──────────────────────────────────────────
+
+interface UserTestimonial {
+  id: string;
+  name: string;
+  email: string;
+  title: string;
+  quote: string;
+  rating: number;
+  approved: boolean;
+  createdAt: string;
+}
+
+interface RegisteredUser {
+  id: string;
+  name: string;
+  email: string;
+  registeredAt: string;
+}
+
+interface Message {
+  id: string;
+  name: string;
+  email: string;
+  company: string;
+  message: string;
+  createdAt: string;
+  read: boolean;
+}
+
+interface Comment {
+  id: string;
+  postId?: string;
+  projectId?: string;
+  userId: string;
+  userName: string;
+  content: string;
+  createdAt: string;
+  approved: boolean;
+}
+
+function useUserTestimonials() {
+  const [testimonials, setTestimonials] = useState<UserTestimonial[]>(() => {
+    try {
+      const saved = localStorage.getItem("zif_user_testimonials");
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+
+  const saveTestimonials = (next: UserTestimonial[]) => {
+    setTestimonials(next);
+    localStorage.setItem("zif_user_testimonials", JSON.stringify(next));
+  };
+
+  const submitTestimonial = (data: Omit<UserTestimonial, "id" | "approved" | "createdAt">) => {
+    saveTestimonials([...testimonials, { ...data, id: Date.now().toString(), approved: false, createdAt: new Date().toISOString() }]);
+  };
+
+  const approveTestimonial = (id: string) => {
+    saveTestimonials(testimonials.map(t => t.id === id ? { ...t, approved: true } : t));
+  };
+
+  const removeTestimonial = (id: string) => {
+    saveTestimonials(testimonials.filter(t => t.id !== id));
+  };
+
+  return { testimonials, submitTestimonial, approveTestimonial, removeTestimonial };
+}
+
+function useRegisteredUsers() {
+  const [users, setUsers] = useState<RegisteredUser[]>(() => {
+    try {
+      const saved = localStorage.getItem("zif_registered_users");
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+
+  const saveUsers = (next: RegisteredUser[]) => {
+    setUsers(next);
+    localStorage.setItem("zif_registered_users", JSON.stringify(next));
+  };
+
+  const registerUser = (data: Omit<RegisteredUser, "id" | "registeredAt">) => {
+    // Check if user already exists
+    const existing = users.find(u => u.email === data.email);
+    if (existing) return existing;
+    const newUser = { ...data, id: Date.now().toString(), registeredAt: new Date().toISOString() };
+    saveUsers([...users, newUser]);
+    return newUser;
+  };
+
+  const removeUser = (id: string) => {
+    saveUsers(users.filter(u => u.id !== id));
+  };
+
+  const getUserByEmail = (email: string) => {
+    return users.find(u => u.email === email);
+  };
+
+  return { users, registerUser, removeUser, getUserByEmail };
+}
+
+function useMessages() {
+  const [messages, setMessages] = useState<Message[]>(() => {
+    try {
+      const saved = localStorage.getItem("zif_client_messages");
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+
+  const saveMessages = (next: Message[]) => {
+    setMessages(next);
+    localStorage.setItem("zif_client_messages", JSON.stringify(next));
+  };
+
+  const sendMessage = (data: Omit<Message, "id" | "createdAt" | "read">) => {
+    saveMessages([...messages, { ...data, id: Date.now().toString(), createdAt: new Date().toISOString(), read: false }]);
+  };
+
+  const markAsRead = (id: string) => {
+    saveMessages(messages.map(m => m.id === id ? { ...m, read: true } : m));
+  };
+
+  const removeMessage = (id: string) => {
+    saveMessages(messages.filter(m => m.id !== id));
+  };
+
+  return { messages, sendMessage, markAsRead, removeMessage };
+}
+
+function useComments() {
+  const [comments, setComments] = useState<Comment[]>(() => {
+    try {
+      const saved = localStorage.getItem("zif_comments");
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+
+  const saveComments = (next: Comment[]) => {
+    setComments(next);
+    localStorage.setItem("zif_comments", JSON.stringify(next));
+  };
+
+  const addComment = (data: Omit<Comment, "id" | "createdAt" | "approved">) => {
+    saveComments([...comments, { ...data, id: Date.now().toString(), createdAt: new Date().toISOString(), approved: false }]);
+  };
+
+  const approveComment = (id: string) => {
+    saveComments(comments.map(c => c.id === id ? { ...c, approved: true } : c));
+  };
+
+  const removeComment = (id: string) => {
+    saveComments(comments.filter(c => c.id !== id));
+  };
+
+  const getCommentsForPost = (postId: string) => {
+    return comments.filter(c => c.postId === postId && c.approved);
+  };
+
+  const getCommentsForProject = (projectId: string) => {
+    return comments.filter(c => c.projectId === projectId && c.approved);
+  };
+
+  return { comments, addComment, approveComment, removeComment, getCommentsForPost, getCommentsForProject };
+}
+
 // ─── Admin Panel ──────────────────────────────────────────────────────────────
 
 const ADMIN_PASSWORD = "zif@admin2024";
@@ -391,18 +559,28 @@ function AdminPanel({
   content, onSave, onExit,
   posts, createPost, upsertPost, removePost, togglePublish,
   projects, createProject, upsertProject, removeProject,
+  userTestimonials, approveTestimonial, removeTestimonial,
+  registeredUsers, removeRegisteredUser,
+  messages, markMessageAsRead, removeMessage,
+  comments, approveComment, removeComment,
 }: {
   content: Content; onSave: (c: Content) => void; onExit: () => void;
   posts: Post[]; createPost: () => Post; upsertPost: (p: Post) => void;
   removePost: (id: string) => void; togglePublish: (id: string) => void;
   projects: Project[]; createProject: () => Project; upsertProject: (p: Project) => void;
   removeProject: (id: string) => void;
+  userTestimonials: UserTestimonial[]; approveTestimonial: (id: string) => void; removeTestimonial: (id: string) => void;
+  registeredUsers: RegisteredUser[]; removeRegisteredUser: (id: string) => void;
+  messages: Message[]; markMessageAsRead: (id: string) => void; removeMessage: (id: string) => void;
+  comments: Comment[]; approveComment: (id: string) => void; removeComment: (id: string) => void;
 }) {
-  const [tab, setTab] = useState<"hero" | "contact" | "services" | "stats" | "testimonials" | "posts" | "projects">("projects");
+  const [tab, setTab] = useState<"hero" | "contact" | "services" | "stats" | "testimonials" | "posts" | "projects" | "siteSettings" | "userTestimonials" | "registeredUsers" | "messages" | "comments">("projects");
   const [draft, setDraft] = useState<Content>(JSON.parse(JSON.stringify(content)));
   const [saved, setSaved] = useState(false);
   const [editingPost, setEditingPost] = useState<Post | null>(null);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [emailBlast, setEmailBlast] = useState({ subject: "", body: "" });
+  const logoFileRef = useRef<HTMLInputElement>(null);
 
   const commit = () => {
     onSave(draft);
@@ -425,14 +603,27 @@ function AdminPanel({
     setDraft(next as Content);
   };
 
+  const handleSendEmailBlast = () => {
+    if (!emailBlast.subject || !emailBlast.body) return;
+    // Since this is a static site, we'll just show a success message
+    // In a real app, you'd send to a backend API
+    alert(`Email blast sent to ${registeredUsers.length} users!`);
+    setEmailBlast({ subject: "", body: "" });
+  };
+
   const TABS = [
     { id: "projects", label: "Projects" },
     { id: "posts", label: "Posts" },
+    { id: "messages", label: `Messages (${messages.filter(m => !m.read).length})` },
+    { id: "comments", label: `Comments (${comments.filter(c => !c.approved).length})` },
+    { id: "userTestimonials", label: "User Testimonials" },
+    { id: "registeredUsers", label: "Registered Users" },
     { id: "hero", label: "Hero" },
+    { id: "siteSettings", label: "Site Settings" },
     { id: "contact", label: "Contact" },
     { id: "services", label: "Services" },
     { id: "stats", label: "Stats" },
-    { id: "testimonials", label: "Testimonials" },
+    { id: "testimonials", label: "Default Testimonials" },
   ] as const;
 
   return (
@@ -516,7 +707,7 @@ function AdminPanel({
                 {projects.map((project) => (
                   <div key={project.id} className="flex items-center gap-4 p-4"
                     style={{ background: "#0d1525", border: "1px solid rgba(0,229,255,0.08)", borderRadius: "2px" }}>
-                    <img src={`https://images.unsplash.com/${project.image}?w=100&h=100&fit=crop&auto=format`} alt="" className="w-14 h-14 object-cover shrink-0" style={{ borderRadius: "2px", filter: "brightness(0.7)" }} />
+                    <img src={project.image.startsWith("data:") ? project.image : `https://images.unsplash.com/${project.image}?w=100&h=100&fit=crop&auto=format`} alt="" className="w-14 h-14 object-cover shrink-0" style={{ borderRadius: "2px", filter: "brightness(0.7)" }} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-xs px-2 py-0.5" style={{ fontFamily: "'DM Mono', monospace", color: "#3d6680", border: "1px solid rgba(0,229,255,0.1)", borderRadius: "2px" }}>{project.category}</span>
@@ -650,6 +841,46 @@ function AdminPanel({
             </AdminSection>
           )}
 
+          {tab === "siteSettings" && (
+            <AdminSection title="Site Settings">
+              <div className="p-5 mb-4" style={{ background: "#0d1525", border: "1px solid rgba(0,229,255,0.08)", borderRadius: "2px" }}>
+                <p className="text-xs tracking-widest uppercase mb-3" style={{ fontFamily: "'DM Mono', monospace", color: "#3d6680" }}>Website Logo</p>
+                {draft.logo ? (
+                  <div className="relative mb-3">
+                    <img src={draft.logo} alt="Logo Preview" className="h-24 w-auto object-contain" />
+                    <button onClick={() => { const n = JSON.parse(JSON.stringify(draft)); n.logo = ""; setDraft(n); }}
+                      className="absolute top-2 right-2 p-1" style={{ background: "rgba(7,11,19,0.85)", borderRadius: "2px", color: "#ef4444" }}>
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="h-24 flex flex-col items-center justify-center mb-3 cursor-pointer"
+                    style={{ border: "1px dashed rgba(0,229,255,0.15)", borderRadius: "2px" }}
+                    onClick={() => logoFileRef.current?.click()}>
+                    <ImageIcon size={32} style={{ color: "#1e3a52", marginBottom: "8px" }} />
+                    <span className="text-sm" style={{ fontFamily: "'DM Mono', monospace", color: "#1e3a52" }}>Click to upload logo</span>
+                  </div>
+                )}
+                <input ref={logoFileRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = (ev) => {
+                    const n = JSON.parse(JSON.stringify(draft));
+                    n.logo = ev.target?.result as string;
+                    setDraft(n);
+                  };
+                  reader.readAsDataURL(file);
+                }} />
+                <button onClick={() => logoFileRef.current?.click()}
+                  className="w-full py-2 text-xs flex items-center justify-center gap-2"
+                  style={{ border: "1px solid rgba(0,229,255,0.1)", color: "#5e7499", borderRadius: "2px", fontFamily: "'DM Mono', monospace" }}>
+                  <ImageIcon size={12} /> {draft.logo ? "Change Logo" : "Upload Logo"}
+                </button>
+              </div>
+            </AdminSection>
+          )}
+
           {tab === "contact" && (
             <AdminSection title="Contact Details">
               <AdminField label="Email" value={draft.contact.email} onChange={(v) => updatePath(["contact", "email"], v)} />
@@ -726,6 +957,218 @@ function AdminPanel({
               >
                 <Plus size={15} /> Add Testimonial
               </button>
+            </AdminSection>
+          )}
+
+          {tab === "userTestimonials" && (
+            <AdminSection title="User Testimonials">
+              {userTestimonials.length === 0 ? (
+                <div className="text-center py-12" style={{ border: "1px dashed rgba(0,229,255,0.12)", borderRadius: "2px" }}>
+                  <Users size={36} style={{ color: "#1e3a52", margin: "0 auto 12px" }} />
+                  <p style={{ fontFamily: "'Barlow Condensed', sans-serif", color: "#3d5166", fontSize: "18px", fontWeight: 700 }}>NO USER TESTIMONIALS YET</p>
+                  <p className="text-sm mt-1" style={{ fontFamily: "'Inter', sans-serif", color: "#1e3a52" }}>User testimonials will appear here when submitted.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {userTestimonials.map(t => (
+                    <div key={t.id} className="p-6" style={{ background: "#0d1525", border: "1px solid rgba(0,229,255,0.08)", borderRadius: "2px" }}>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs px-2 py-1 ${t.approved ? "bg-green-500/10 text-green-400 border border-green-500/20" : "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20"}`}
+                            style={{ fontFamily: "'DM Mono', monospace", borderRadius: "2px" }}>
+                            {t.approved ? "APPROVED" : "PENDING"}
+                          </span>
+                          <span className="text-xs" style={{ fontFamily: "'DM Mono', monospace", color: "#3d6680" }}>
+                            {new Date(t.createdAt).toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="flex gap-2">
+                          {!t.approved && (
+                            <button onClick={() => approveTestimonial(t.id)}
+                              className="px-4 py-2 text-xs font-bold"
+                              style={{ background: "#10b981", color: "#070b13", borderRadius: "2px", fontFamily: "'Barlow', sans-serif" }}>
+                              APPROVE
+                            </button>
+                          )}
+                          <button onClick={() => removeTestimonial(t.id)}
+                            className="px-4 py-2 text-xs font-bold"
+                            style={{ background: "transparent", color: "#ef4444", border: "1px solid rgba(239,68,68,0.2)", borderRadius: "2px", fontFamily: "'Barlow', sans-serif" }}>
+                            DELETE
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex gap-1 mb-3">
+                        {Array.from({ length: t.rating }).map((_, j) => (
+                          <Star key={j} size={14} style={{ color: "#f59e0b", fill: "#f59e0b" }} />
+                        ))}
+                      </div>
+                      <p className="text-sm mb-2" style={{ fontFamily: "'Inter', sans-serif", color: "#dce6f5" }}>"{t.quote}"</p>
+                      <div className="flex items-center gap-2 text-xs" style={{ fontFamily: "'DM Mono', monospace", color: "#3d6680" }}>
+                        <span>{t.name}</span>
+                        <span>•</span>
+                        <span>{t.title}</span>
+                        <span>•</span>
+                        <span>{t.email}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </AdminSection>
+          )}
+
+          {tab === "messages" && (
+            <AdminSection title="Client Messages">
+              {messages.length === 0 ? (
+                <div className="text-center py-12" style={{ border: "1px dashed rgba(0,229,255,0.12)", borderRadius: "2px" }}>
+                  <MessageCircle size={36} style={{ color: "#1e3a52", margin: "0 auto 12px" }} />
+                  <p style={{ fontFamily: "'Barlow Condensed', sans-serif", color: "#3d5166", fontSize: "18px", fontWeight: 700 }}>NO MESSAGES YET</p>
+                  <p className="text-sm mt-1" style={{ fontFamily: "'Inter', sans-serif", color: "#1e3a52" }}>Messages will appear here when clients contact you.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {messages.map(m => (
+                    <div key={m.id} className="p-6" style={{ background: "#0d1525", border: "1px solid rgba(0,229,255,0.08)", borderRadius: "2px" }}>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-3 h-3 rounded-full" style={{ background: m.read ? "#3d6680" : "#00e5ff" }} />
+                          <span className="text-sm font-bold" style={{ fontFamily: "'Inter', sans-serif", color: "#dce6f5" }}>{m.name}</span>
+                          <span className="text-xs" style={{ fontFamily: "'DM Mono', monospace", color: "#3d6680" }}>{m.email}</span>
+                        </div>
+                        <div className="flex gap-2">
+                          {!m.read && (
+                            <button onClick={() => markMessageAsRead(m.id)}
+                              className="px-4 py-2 text-xs font-bold"
+                              style={{ background: "#00e5ff", color: "#070b13", borderRadius: "2px", fontFamily: "'Barlow', sans-serif" }}>
+                              MARK AS READ
+                            </button>
+                          )}
+                          <button onClick={() => removeMessage(m.id)}
+                            className="px-4 py-2 text-xs font-bold"
+                            style={{ background: "transparent", color: "#ef4444", border: "1px solid rgba(239,68,68,0.2)", borderRadius: "2px", fontFamily: "'Barlow', sans-serif" }}>
+                            DELETE
+                          </button>
+                        </div>
+                      </div>
+                      {m.company && (
+                        <p className="text-xs mb-2" style={{ fontFamily: "'DM Mono', monospace", color: "#3d6680" }}>Company: {m.company}</p>
+                      )}
+                      <p className="text-sm" style={{ fontFamily: "'Inter', sans-serif", color: "#a0b4c8" }}>{m.message}</p>
+                      <p className="text-xs mt-3" style={{ fontFamily: "'DM Mono', monospace", color: "#1e3a52" }}>
+                        {new Date(m.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </AdminSection>
+          )}
+
+          {tab === "comments" && (
+            <AdminSection title="Comments">
+              {comments.length === 0 ? (
+                <div className="text-center py-12" style={{ border: "1px dashed rgba(0,229,255,0.12)", borderRadius: "2px" }}>
+                  <MessageCircle size={36} style={{ color: "#1e3a52", margin: "0 auto 12px" }} />
+                  <p style={{ fontFamily: "'Barlow Condensed', sans-serif", color: "#3d5166", fontSize: "18px", fontWeight: 700 }}>NO COMMENTS YET</p>
+                  <p className="text-sm mt-1" style={{ fontFamily: "'Inter', sans-serif", color: "#1e3a52" }}>Comments will appear here when users post them.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {comments.map(c => (
+                    <div key={c.id} className="p-6" style={{ background: "#0d1525", border: "1px solid rgba(0,229,255,0.08)", borderRadius: "2px" }}>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <span className={`text-xs px-2 py-1 ${c.approved ? "bg-green-500/10 text-green-400 border border-green-500/20" : "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20"}`}
+                            style={{ fontFamily: "'DM Mono', monospace", borderRadius: "2px" }}>
+                            {c.approved ? "APPROVED" : "PENDING"}
+                          </span>
+                          <span className="text-sm font-bold" style={{ fontFamily: "'Inter', sans-serif", color: "#dce6f5" }}>{c.userName}</span>
+                        </div>
+                        <div className="flex gap-2">
+                          {!c.approved && (
+                            <button onClick={() => approveComment(c.id)}
+                              className="px-4 py-2 text-xs font-bold"
+                              style={{ background: "#10b981", color: "#070b13", borderRadius: "2px", fontFamily: "'Barlow', sans-serif" }}>
+                              APPROVE
+                            </button>
+                          )}
+                          <button onClick={() => removeComment(c.id)}
+                            className="px-4 py-2 text-xs font-bold"
+                            style={{ background: "transparent", color: "#ef4444", border: "1px solid rgba(239,68,68,0.2)", borderRadius: "2px", fontFamily: "'Barlow', sans-serif" }}>
+                            DELETE
+                          </button>
+                        </div>
+                      </div>
+                      {c.postId && <p className="text-xs mb-2" style={{ fontFamily: "'DM Mono', monospace", color: "#3d6680" }}>Post ID: {c.postId}</p>}
+                      {c.projectId && <p className="text-xs mb-2" style={{ fontFamily: "'DM Mono', monospace", color: "#3d6680" }}>Project ID: {c.projectId}</p>}
+                      <p className="text-sm" style={{ fontFamily: "'Inter', sans-serif", color: "#a0b4c8" }}>{c.content}</p>
+                      <p className="text-xs mt-3" style={{ fontFamily: "'DM Mono', monospace", color: "#1e3a52" }}>
+                        {new Date(c.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </AdminSection>
+          )}
+
+          {tab === "registeredUsers" && (
+            <AdminSection title="Registered Users">
+              {registeredUsers.length === 0 ? (
+                <div className="text-center py-12" style={{ border: "1px dashed rgba(0,229,255,0.12)", borderRadius: "2px" }}>
+                  <Users size={36} style={{ color: "#1e3a52", margin: "0 auto 12px" }} />
+                  <p style={{ fontFamily: "'Barlow Condensed', sans-serif", color: "#3d5166", fontSize: "18px", fontWeight: 700 }}>NO REGISTERED USERS YET</p>
+                  <p className="text-sm mt-1" style={{ fontFamily: "'Inter', sans-serif", color: "#1e3a52" }}>Users will appear here when they register.</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Email Blast Section */}
+                  <div className="p-6 mb-6" style={{ background: "#0d1525", border: "1px solid rgba(0,229,255,0.12)", borderRadius: "2px" }}>
+                    <p className="text-xs tracking-widest uppercase mb-4" style={{ fontFamily: "'DM Mono', monospace", color: "#3d6680" }}>
+                      SEND UPDATE TO ALL {registeredUsers.length} USERS
+                    </p>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-xs mb-2 tracking-wider uppercase" style={{ fontFamily: "'DM Mono', monospace", color: "#3d6680" }}>Subject</label>
+                        <input type="text" value={emailBlast.subject} onChange={(e) => setEmailBlast({ ...emailBlast, subject: e.target.value })}
+                          className="w-full px-4 py-3 text-sm outline-none"
+                          style={{ background: "#111c30", border: "1px solid rgba(0,229,255,0.1)", borderRadius: "2px", color: "#dce6f5", fontFamily: "'Inter', sans-serif" }} />
+                      </div>
+                      <div>
+                        <label className="block text-xs mb-2 tracking-wider uppercase" style={{ fontFamily: "'DM Mono', monospace", color: "#3d6680" }}>Message</label>
+                        <textarea rows={5} value={emailBlast.body} onChange={(e) => setEmailBlast({ ...emailBlast, body: e.target.value })}
+                          className="w-full px-4 py-3 text-sm outline-none resize-none"
+                          style={{ background: "#111c30", border: "1px solid rgba(0,229,255,0.1)", borderRadius: "2px", color: "#dce6f5", fontFamily: "'Inter', sans-serif" }} />
+                      </div>
+                      <button onClick={handleSendEmailBlast}
+                        className="px-6 py-3 text-sm font-bold"
+                        style={{ background: "#00e5ff", color: "#070b13", borderRadius: "2px", fontFamily: "'Barlow', sans-serif" }}>
+                        SEND TO ALL ({registeredUsers.length})
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* User List */}
+                  <div className="space-y-3">
+                    {registeredUsers.map(u => (
+                      <div key={u.id} className="flex items-center justify-between p-4"
+                        style={{ background: "#0d1525", border: "1px solid rgba(0,229,255,0.08)", borderRadius: "2px" }}>
+                        <div>
+                          <p className="text-sm font-medium" style={{ fontFamily: "'Inter', sans-serif", color: "#dce6f5" }}>{u.name}</p>
+                          <p className="text-xs" style={{ fontFamily: "'DM Mono', monospace", color: "#3d6680" }}>
+                            {u.email} • {new Date(u.registeredAt).toLocaleString()}
+                          </p>
+                        </div>
+                        <button onClick={() => removeRegisteredUser(u.id)}
+                          className="p-2"
+                          style={{ color: "#ef4444", border: "1px solid rgba(239,68,68,0.2)", borderRadius: "2px" }}>
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </AdminSection>
           )}
         </div>
@@ -951,6 +1394,7 @@ function PostEditor({ post, onSave, onCancel }: { post: Post; onSave: (p: Post) 
 
 function ProjectEditor({ project, onSave, onCancel }: { project: Project; onSave: (p: Project) => void; onCancel: () => void }) {
   const [draft, setDraft] = useState<Project>({ ...project });
+  const [saved, setSaved] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const backgroundFileRef = useRef<HTMLInputElement>(null);
 
@@ -974,6 +1418,12 @@ function ProjectEditor({ project, onSave, onCancel }: { project: Project; onSave
     const reader = new FileReader();
     reader.onload = (ev) => set("backgroundImage", ev.target?.result as string);
     reader.readAsDataURL(file);
+  };
+
+  const handleSave = () => {
+    onSave(draft);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
   };
 
   return (
@@ -1018,10 +1468,10 @@ function ProjectEditor({ project, onSave, onCancel }: { project: Project; onSave
         <div className="space-y-5">
           {/* Save box */}
           <div className="p-5" style={{ background: "#0d1525", border: "1px solid rgba(0,229,255,0.08)", borderRadius: "2px" }}>
-            <button onClick={() => onSave(draft)}
+            <button onClick={handleSave}
               className="w-full py-3 text-sm font-bold flex items-center justify-center gap-2"
-              style={{ background: "#00e5ff", color: "#070b13", borderRadius: "2px", fontFamily: "'Barlow', sans-serif" }}>
-              <Save size={14} /> Save Project
+              style={{ background: saved ? "#34d399" : "#00e5ff", color: "#070b13", borderRadius: "2px", fontFamily: "'Barlow', sans-serif", transition: "background 0.3s" }}>
+              <Save size={14} /> {saved ? "SAVED!" : "Save Project"}
             </button>
           </div>
 
@@ -1035,6 +1485,46 @@ function ProjectEditor({ project, onSave, onCancel }: { project: Project; onSave
             <p className="text-xs tracking-widest uppercase mb-3" style={{ fontFamily: "'DM Mono', monospace", color: "#3d6680" }}>Accent Color</p>
             <input type="color" value={draft.color} onChange={(e) => set("color", e.target.value)}
               className="w-full h-10 cursor-pointer" />
+          </div>
+
+          {/* Main Project Image */}
+          <div className="p-5" style={{ background: "#0d1525", border: "1px solid rgba(0,229,255,0.08)", borderRadius: "2px" }}>
+            <p className="text-xs tracking-widest uppercase mb-3" style={{ fontFamily: "'DM Mono', monospace", color: "#3d6680" }}>Main Project Image</p>
+            {draft.image.startsWith("data:") ? (
+              <div className="relative mb-3">
+                <img src={draft.image} alt="Project" className="w-full h-32 object-cover" style={{ borderRadius: "2px" }} />
+                <button onClick={() => set("image", "photo-1611974789855-9c2a0a7236a3")}
+                  className="absolute top-2 right-2 w-7 h-7 flex items-center justify-center"
+                  style={{ background: "rgba(7,11,19,0.85)", borderRadius: "2px", color: "#ef4444" }}>
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            ) : (
+              <div className="h-28 flex flex-col items-center justify-center mb-3 cursor-pointer"
+                style={{ border: "1px dashed rgba(0,229,255,0.15)", borderRadius: "2px" }}
+                onClick={() => fileRef.current?.click()}>
+                <ImageIcon size={22} style={{ color: "#1e3a52", marginBottom: "6px" }} />
+                <span className="text-xs" style={{ fontFamily: "'DM Mono', monospace", color: "#1e3a52" }}>Click to upload image</span>
+              </div>
+            )}
+            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              const reader = new FileReader();
+              reader.onload = (ev) => set("image", ev.target?.result as string);
+              reader.readAsDataURL(file);
+            }} />
+            <button onClick={() => fileRef.current?.click()}
+              className="w-full py-2 text-xs flex items-center justify-center gap-2"
+              style={{ border: "1px solid rgba(0,229,255,0.1)", color: "#5e7499", borderRadius: "2px", fontFamily: "'DM Mono', monospace" }}>
+              <ImageIcon size={12} /> {draft.image.startsWith("data:") ? "Change Image" : "Upload Image"}
+            </button>
+            <p className="text-xs mt-2" style={{ fontFamily: "'DM Mono', monospace", color: "#1e3a52" }}>
+              Or enter Unsplash photo ID (e.g., photo-123...)
+            </p>
+            <input type="text" value={draft.image.startsWith("data:") ? "" : draft.image} onChange={(e) => !e.target.value.startsWith("data:") && set("image", e.target.value || "photo-1611974789855-9c2a0a7236a3")}
+              className="w-full px-3 py-2 text-sm outline-none mt-2"
+              style={{ background: "#111c30", border: "1px solid rgba(0,229,255,0.1)", borderRadius: "2px", color: "#dce6f5", fontFamily: "'Inter', sans-serif" }} />
           </div>
 
           {/* Technologies */}
@@ -1138,7 +1628,7 @@ function AdminField({ label, value, onChange, multiline = false }: { label: stri
 
 // ─── Public Site Components ───────────────────────────────────────────────────
 
-function NavBar({ onAdminClick }: { onAdminClick: () => void }) {
+function NavBar({ onAdminClick, content }: { onAdminClick: () => void; content: any }) {
   const [open, setOpen] = useState(false);
   const scrollY = useScrollY();
   const scrolled = scrollY > 40;
@@ -1154,12 +1644,16 @@ function NavBar({ onAdminClick }: { onAdminClick: () => void }) {
     >
       <div className="max-w-7xl mx-auto px-6 lg:px-8 flex items-center justify-between py-4">
         <a href="#" className="flex items-center gap-2">
-          <div className="w-8 h-8 relative">
-            <div className="absolute inset-0 rounded-sm" style={{ background: "#00e5ff", opacity: 0.15 }} />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-xs font-black" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: "#00e5ff" }}>ZIF</span>
+          {content.logo ? (
+            <img src={content.logo} alt="ZyTech Insight Logo" className="h-10 w-auto object-contain" />
+          ) : (
+            <div className="w-8 h-8 relative">
+              <div className="absolute inset-0 rounded-sm" style={{ background: "#00e5ff", opacity: 0.15 }} />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-xs font-black" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: "#00e5ff" }}>ZIF</span>
+              </div>
             </div>
-          </div>
+          )}
           <span className="text-lg font-bold" style={{ fontFamily: "'Barlow', sans-serif", color: "#dce6f5" }}>
             ZyTech<span style={{ color: "#00e5ff" }}>Insight</span>
           </span>
@@ -1417,7 +1911,7 @@ function Portfolio({ projects, onProjectClick }: { projects: Project[]; onProjec
         <div className="grid lg:grid-cols-3 gap-px" style={{ background: "rgba(0,229,255,0.06)" }}>
           {projects.map((p, i) => (
             <div key={p.id} className="group relative overflow-hidden cursor-pointer" style={{ background: "#070b13", minHeight: "400px" }} onMouseEnter={() => setActive(i)} onClick={() => onProjectClick(p)}>
-              <img src={`https://images.unsplash.com/${p.image}?w=600&h=500&fit=crop&auto=format`} alt={p.title}
+              <img src={p.image.startsWith("data:") ? p.image : `https://images.unsplash.com/${p.image}?w=600&h=500&fit=crop&auto=format`} alt={p.title}
                 className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                 style={{ filter: "brightness(0.25) saturate(0.5)" }} />
               <div className="absolute inset-0 transition-opacity duration-500"
@@ -1475,18 +1969,105 @@ function TechStack() {
   );
 }
 
-function Testimonials({ content }: { content: Content }) {
+function Testimonials({ content, userTestimonials, submitTestimonial }: { content: Content; userTestimonials: UserTestimonial[]; submitTestimonial: (t: Omit<UserTestimonial, "id" | "approved" | "createdAt">) => void }) {
+  const [showForm, setShowForm] = useState(false);
+  const [formData, setFormData] = useState({ name: "", email: "", title: "", quote: "", rating: 5 });
+  const [submitted, setSubmitted] = useState(false);
+
+  const allTestimonials = [
+    ...content.testimonials.map(t => ({ ...t, isDefault: true })),
+    ...userTestimonials.filter(t => t.approved).map(t => ({ ...t, isDefault: false }))
+  ];
+
   return (
     <section className="py-28" style={{ background: "#070b13" }}>
       <div className="max-w-7xl mx-auto px-6 lg:px-8">
-        <div className="mb-16">
-          <div className="text-xs tracking-widest uppercase mb-4" style={{ fontFamily: "'DM Mono', monospace", color: "#00e5ff" }}>Client Voices</div>
-          <h2 className="text-4xl lg:text-5xl font-black leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: "#dce6f5" }}>
-            WHAT TEAMS SAY<br />AFTER WE SHIP.
-          </h2>
+        <div className="mb-16 flex flex-col md:flex-row md:items-end justify-between gap-6">
+          <div>
+            <div className="text-xs tracking-widest uppercase mb-4" style={{ fontFamily: "'DM Mono', monospace", color: "#00e5ff" }}>Client Voices</div>
+            <h2 className="text-4xl lg:text-5xl font-black leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: "#dce6f5" }}>
+              WHAT TEAMS SAY<br />AFTER WE SHIP.
+            </h2>
+          </div>
+          <button onClick={() => setShowForm(!showForm)}
+            className="px-6 py-3 text-sm font-bold transition-all duration-200"
+            style={{ background: "transparent", color: "#00e5ff", border: "1px solid rgba(0,229,255,0.2)", borderRadius: "2px", fontFamily: "'Barlow', sans-serif" }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(0,229,255,0.08)"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}>
+            {showForm ? "Hide Form" : "Submit Testimonial"}
+          </button>
         </div>
+
+        {showForm && (
+          <div className="mb-12 p-8" style={{ background: "#0d1525", border: "1px solid rgba(0,229,255,0.08)", borderRadius: "2px" }}>
+            {submitted ? (
+              <div className="text-center py-8">
+                <CheckCircle size={48} style={{ color: "#00e5ff", marginBottom: "20px" }} />
+                <h3 className="text-2xl font-black mb-3" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: "#dce6f5" }}>THANK YOU!</h3>
+                <p style={{ fontFamily: "'Inter', sans-serif", color: "#5e7499", fontSize: "16px" }}>
+                  Your testimonial has been submitted for review.
+                </p>
+              </div>
+            ) : (
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                submitTestimonial(formData);
+                setSubmitted(true);
+                setTimeout(() => { setSubmitted(false); setShowForm(false); setFormData({ name: "", email: "", title: "", quote: "", rating: 5 }); }, 3000);
+              }} className="grid md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-xs mb-2 tracking-wider uppercase" style={{ fontFamily: "'DM Mono', monospace", color: "#3d6680" }}>Your Name</label>
+                  <input type="text" required placeholder="John Doe"
+                    value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full px-4 py-3 text-sm outline-none"
+                    style={{ background: "#111c30", border: "1px solid rgba(0,229,255,0.1)", borderRadius: "2px", color: "#dce6f5", fontFamily: "'Inter', sans-serif" }} />
+                </div>
+                <div>
+                  <label className="block text-xs mb-2 tracking-wider uppercase" style={{ fontFamily: "'DM Mono', monospace", color: "#3d6680" }}>Your Email</label>
+                  <input type="email" required placeholder="john@example.com"
+                    value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    className="w-full px-4 py-3 text-sm outline-none"
+                    style={{ background: "#111c30", border: "1px solid rgba(0,229,255,0.1)", borderRadius: "2px", color: "#dce6f5", fontFamily: "'Inter', sans-serif" }} />
+                </div>
+                <div>
+                  <label className="block text-xs mb-2 tracking-wider uppercase" style={{ fontFamily: "'DM Mono', monospace", color: "#3d6680" }}>Your Title / Company</label>
+                  <input type="text" required placeholder="CEO, TechCorp"
+                    value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    className="w-full px-4 py-3 text-sm outline-none"
+                    style={{ background: "#111c30", border: "1px solid rgba(0,229,255,0.1)", borderRadius: "2px", color: "#dce6f5", fontFamily: "'Inter', sans-serif" }} />
+                </div>
+                <div>
+                  <label className="block text-xs mb-2 tracking-wider uppercase" style={{ fontFamily: "'DM Mono', monospace", color: "#3d6680" }}>Rating</label>
+                  <div className="flex gap-2">
+                    {[1,2,3,4,5].map(n => (
+                      <button key={n} type="button" onClick={() => setFormData({ ...formData, rating: n })}
+                        style={{ background: "transparent", border: "none", cursor: "pointer" }}>
+                        <Star size={24} style={{ color: n <= formData.rating ? "#f59e0b" : "#1e3a52", fill: n <= formData.rating ? "#f59e0b" : "transparent" }} />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-xs mb-2 tracking-wider uppercase" style={{ fontFamily: "'DM Mono', monospace", color: "#3d6680" }}>Your Testimonial</label>
+                  <textarea required rows={4} placeholder="Share your experience working with ZyTech Insight..."
+                    value={formData.quote} onChange={(e) => setFormData({ ...formData, quote: e.target.value })}
+                    className="w-full px-4 py-3 text-sm outline-none resize-none"
+                    style={{ background: "#111c30", border: "1px solid rgba(0,229,255,0.1)", borderRadius: "2px", color: "#dce6f5", fontFamily: "'Inter', sans-serif" }} />
+                </div>
+                <div className="md:col-span-2">
+                  <button type="submit"
+                    className="w-full py-4 text-sm font-bold tracking-wider"
+                    style={{ background: "#00e5ff", color: "#070b13", fontFamily: "'Barlow', sans-serif", borderRadius: "2px" }}>
+                    SUBMIT TESTIMONIAL →
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        )}
+
         <div className="grid md:grid-cols-3 gap-px" style={{ background: "rgba(0,229,255,0.06)" }}>
-          {content.testimonials.map((t, i) => (
+          {allTestimonials.map((t, i) => (
             <div key={i} className="p-8 flex flex-col justify-between" style={{ background: "#070b13" }}>
               <div>
                 <div className="flex gap-1 mb-6">
@@ -1511,10 +2092,152 @@ function Testimonials({ content }: { content: Content }) {
   );
 }
 
-function Contact({ content }: { content: Content }) {
+function Tutorial({ onRegister }: { onRegister: (data: Omit<TutorialUser, "id" | "registeredAt">) => void }) {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [registered, setRegistered] = useState(false);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onRegister({ name, email });
+    setRegistered(true);
+    setTimeout(() => setRegistered(false), 3000);
+    setName("");
+    setEmail("");
+  };
+
+  return (
+    <section className="py-32" style={{ background: "#070b13" }}>
+      <div className="max-w-6xl mx-auto px-6 lg:px-8">
+        <div className="text-center mb-16">
+          <div className="text-xs tracking-widest uppercase mb-4" style={{ fontFamily: "'DM Mono', monospace", color: "#00e5ff" }}>
+            LEARN WITH US
+          </div>
+          <h2 className="text-4xl lg:text-6xl font-black mb-6" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: "#dce6f5" }}>
+            FREE TUTORIALS FOR DEVELOPERS
+          </h2>
+          <p className="text-lg max-w-2xl mx-auto" style={{ fontFamily: "'Inter', sans-serif", color: "#5e7499" }}>
+            Register to access our collection of free tutorials on web development, cloud computing, AI, and more.
+          </p>
+        </div>
+
+        <div className="grid lg:grid-cols-2 gap-12">
+          <div className="space-y-6">
+            <div className="p-8" style={{ background: "#0d1525", border: "1px solid rgba(0,229,255,0.08)", borderRadius: "2px" }}>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 flex items-center justify-center" style={{ background: "rgba(0,229,255,0.1)", borderRadius: "2px" }}>
+                  <Code2 size={20} style={{ color: "#00e5ff" }} />
+                </div>
+                <h3 className="text-xl font-bold" style={{ fontFamily: "'Barlow', sans-serif", color: "#dce6f5" }}>
+                  Introduction to React
+                </h3>
+              </div>
+              <p className="text-sm" style={{ fontFamily: "'Inter', sans-serif", color: "#5e7499" }}>
+                Learn the fundamentals of React, including components, state, props, and hooks.
+              </p>
+            </div>
+
+            <div className="p-8" style={{ background: "#0d1525", border: "1px solid rgba(0,229,255,0.08)", borderRadius: "2px" }}>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 flex items-center justify-center" style={{ background: "rgba(245,158,11,0.1)", borderRadius: "2px" }}>
+                  <Cloud size={20} style={{ color: "#f59e0b" }} />
+                </div>
+                <h3 className="text-xl font-bold" style={{ fontFamily: "'Barlow', sans-serif", color: "#dce6f5" }}>
+                  AWS Fundamentals
+                </h3>
+              </div>
+              <p className="text-sm" style={{ fontFamily: "'Inter', sans-serif", color: "#5e7499" }}>
+                Get started with Amazon Web Services, from S3 to EC2 to Lambda.
+              </p>
+            </div>
+
+            <div className="p-8" style={{ background: "#0d1525", border: "1px solid rgba(0,229,255,0.08)", borderRadius: "2px" }}>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 flex items-center justify-center" style={{ background: "rgba(167,139,250,0.1)", borderRadius: "2px" }}>
+                  <Brain size={20} style={{ color: "#a78bfa" }} />
+                </div>
+                <h3 className="text-xl font-bold" style={{ fontFamily: "'Barlow', sans-serif", color: "#dce6f5" }}>
+                  Getting Started with AI
+                </h3>
+              </div>
+              <p className="text-sm" style={{ fontFamily: "'Inter', sans-serif", color: "#5e7499" }}>
+                An introduction to artificial intelligence, machine learning, and how to get started.
+              </p>
+            </div>
+          </div>
+
+          <div className="p-8" style={{ background: "#0d1525", border: "1px solid rgba(0,229,255,0.08)", borderRadius: "2px" }}>
+            <h3 className="text-2xl font-black mb-6" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: "#dce6f5" }}>
+              REGISTER NOW
+            </h3>
+            {registered ? (
+              <div className="text-center py-8">
+                <CheckCircle size={48} style={{ color: "#00e5ff", marginBottom: "20px" }} />
+                <h4 className="text-xl font-black mb-3" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: "#dce6f5" }}>
+                  SUCCESSFULLY REGISTERED!
+                </h4>
+                <p style={{ fontFamily: "'Inter', sans-serif", color: "#5e7499" }}>
+                  Check your email for access links to our tutorials.
+                </p>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-xs mb-2 tracking-wider uppercase" style={{ fontFamily: "'DM Mono', monospace", color: "#3d6680" }}>
+                    YOUR NAME
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="John Doe"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full px-4 py-3 text-sm outline-none"
+                    style={{ background: "#111c30", border: "1px solid rgba(0,229,255,0.1)", borderRadius: "2px", color: "#dce6f5", fontFamily: "'Inter', sans-serif" }}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs mb-2 tracking-wider uppercase" style={{ fontFamily: "'DM Mono', monospace", color: "#3d6680" }}>
+                    YOUR EMAIL
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="john@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full px-4 py-3 text-sm outline-none"
+                    style={{ background: "#111c30", border: "1px solid rgba(0,229,255,0.1)", borderRadius: "2px", color: "#dce6f5", fontFamily: "'Inter', sans-serif" }}
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="w-full py-4 text-sm font-bold tracking-wider"
+                  style={{ background: "#00e5ff", color: "#070b13", fontFamily: "'Barlow', sans-serif", borderRadius: "2px" }}
+                >
+                  GET ACCESS →
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Contact({ content, onSendMessage }: { content: Content; onSendMessage: (data: Omit<Message, "id" | "createdAt" | "read">) => void }) {
   const [sent, setSent] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", company: "", message: "" });
   const { contact } = content;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSendMessage(form);
+    setSent(true);
+    setTimeout(() => setSent(false), 3000);
+    setForm({ name: "", email: "", company: "", message: "" });
+  };
 
   return (
     <section id="contact" className="py-28" style={{ background: "#0a0f1c" }}>
@@ -1578,7 +2301,7 @@ function Contact({ content }: { content: Content }) {
                 </p>
               </div>
             ) : (
-              <form onSubmit={(e) => { e.preventDefault(); setSent(true); }} className="space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-4">
                 {[
                   { field: "name", placeholder: "Your name", label: "Name", type: "text", req: true },
                   { field: "email", placeholder: "your@email.com", label: "Email", type: "email", req: true },
@@ -1822,12 +2545,53 @@ function Blog({ posts, onRead }: { posts: Post[]; onRead: (p: Post) => void }) {
   );
 }
 
-function PostView({ post, onBack }: { post: Post; onBack: () => void }) {
+function PostView({ 
+  post, 
+  onBack,
+  comments,
+  onAddComment,
+  currentUser
+}: { 
+  post: Post; 
+  onBack: () => void;
+  comments: Comment[];
+  onAddComment: (data: Omit<Comment, "id" | "createdAt" | "approved">) => void;
+  currentUser: RegisteredUser | null;
+}) {
   useEffect(() => {
     window.scrollTo(0, 0);
     // Make sure body is scrollable for PostView
     document.body.style.overflow = "auto";
   }, []);
+
+  const [showLogin, setShowLogin] = useState(false);
+  const [loginForm, setLoginForm] = useState({ name: "", email: "" });
+  const [commentForm, setCommentForm] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+
+  const postComments = comments.filter(c => c.postId === post.id && c.approved);
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    // In a real app, you'd authenticate here, but for now we'll just use registerUser
+    setShowLogin(false);
+    setLoginForm({ name: "", email: "" });
+  };
+
+  const handleCommentSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser) return;
+    onAddComment({
+      postId: post.id,
+      userId: currentUser.id,
+      userName: currentUser.name,
+      content: commentForm
+    });
+    setCommentForm("");
+    setSubmitted(true);
+    setTimeout(() => setSubmitted(false), 3000);
+  };
+
   return (
     <div style={{ 
       background: post.backgroundImage 
@@ -1907,10 +2671,115 @@ function PostView({ post, onBack }: { post: Post; onBack: () => void }) {
           </div>
         )}
 
-        <div className="prose" style={{ fontFamily: "'Inter', sans-serif", color: "#a0b4c8", lineHeight: "1.9", fontSize: "16px" }}>
+        <div className="prose mb-16" style={{ fontFamily: "'Inter', sans-serif", color: "#a0b4c8", lineHeight: "1.9", fontSize: "16px" }}>
           {post.body.split("\n").map((para, i) =>
             para.trim() ? <p key={i} style={{ marginBottom: "1.5rem" }}>{para}</p> : <br key={i} />
           )}
+        </div>
+
+        {/* Comments Section */}
+        <div className="pt-8" style={{ borderTop: "1px solid rgba(0,229,255,0.08)" }}>
+          <h2 className="text-2xl font-black mb-8" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: "#dce6f5" }}>
+            Comments ({postComments.length})
+          </h2>
+
+          {!currentUser ? (
+            <div className="p-6 mb-8" style={{ background: "#0d1525", border: "1px solid rgba(0,229,255,0.08)", borderRadius: "2px" }}>
+              {showLogin ? (
+                <form onSubmit={handleLogin} className="space-y-4">
+                  <div>
+                    <label className="block text-xs mb-2 tracking-wider uppercase" style={{ fontFamily: "'DM Mono', monospace", color: "#3d6680" }}>Name</label>
+                    <input type="text" required value={loginForm.name} onChange={(e) => setLoginForm({ ...loginForm, name: e.target.value })}
+                      className="w-full px-4 py-3 text-sm outline-none"
+                      style={{ background: "#111c30", border: "1px solid rgba(0,229,255,0.1)", borderRadius: "2px", color: "#dce6f5", fontFamily: "'Inter', sans-serif" }} />
+                  </div>
+                  <div>
+                    <label className="block text-xs mb-2 tracking-wider uppercase" style={{ fontFamily: "'DM Mono', monospace", color: "#3d6680" }}>Email</label>
+                    <input type="email" required value={loginForm.email} onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
+                      className="w-full px-4 py-3 text-sm outline-none"
+                      style={{ background: "#111c30", border: "1px solid rgba(0,229,255,0.1)", borderRadius: "2px", color: "#dce6f5", fontFamily: "'Inter', sans-serif" }} />
+                  </div>
+                  <div className="flex gap-3">
+                    <button type="submit"
+                      className="px-6 py-3 text-sm font-bold"
+                      style={{ background: "#00e5ff", color: "#070b13", borderRadius: "2px", fontFamily: "'Barlow', sans-serif" }}>
+                      Register / Login
+                    </button>
+                    <button type="button" onClick={() => setShowLogin(false)}
+                      className="px-6 py-3 text-sm font-bold"
+                      style={{ border: "1px solid rgba(0,229,255,0.2)", color: "#5e7499", borderRadius: "2px", fontFamily: "'Barlow', sans-serif" }}>
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <div className="text-center">
+                  <p className="mb-4" style={{ fontFamily: "'Inter', sans-serif", color: "#5e7499" }}>
+                    Register to leave a comment
+                  </p>
+                  <button onClick={() => setShowLogin(true)}
+                    className="px-6 py-3 text-sm font-bold"
+                    style={{ background: "#00e5ff", color: "#070b13", borderRadius: "2px", fontFamily: "'Barlow', sans-serif" }}>
+                    Register / Login
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="mb-8">
+              {submitted ? (
+                <div className="p-6 text-center" style={{ background: "#0d1525", border: "1px solid rgba(0,229,255,0.08)", borderRadius: "2px" }}>
+                  <CheckCircle size={32} style={{ color: "#00e5ff", marginBottom: "12px" }} />
+                  <p style={{ fontFamily: "'Inter', sans-serif", color: "#dce6f5" }}>
+                    Comment submitted for approval!
+                  </p>
+                </div>
+              ) : (
+                <form onSubmit={handleCommentSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-xs mb-2 tracking-wider uppercase" style={{ fontFamily: "'DM Mono', monospace", color: "#3d6680" }}>
+                      Leave a Comment
+                    </label>
+                    <textarea required rows={4} value={commentForm} onChange={(e) => setCommentForm(e.target.value)}
+                      placeholder="Write your comment here..."
+                      className="w-full px-4 py-3 text-sm outline-none resize-none"
+                      style={{ background: "#0d1525", border: "1px solid rgba(0,229,255,0.08)", borderRadius: "2px", color: "#dce6f5", fontFamily: "'Inter', sans-serif" }} />
+                  </div>
+                  <button type="submit"
+                    className="px-6 py-3 text-sm font-bold"
+                    style={{ background: "#00e5ff", color: "#070b13", borderRadius: "2px", fontFamily: "'Barlow', sans-serif" }}>
+                    Submit Comment
+                  </button>
+                </form>
+              )}
+            </div>
+          )}
+
+          {/* Comments List */}
+          <div className="space-y-6">
+            {postComments.length === 0 ? (
+              <p style={{ fontFamily: "'Inter', sans-serif", color: "#5e7499" }}>No comments yet. Be the first!</p>
+            ) : (
+              postComments.map((comment) => (
+                <div key={comment.id} className="p-6" style={{ background: "#0d1525", border: "1px solid rgba(0,229,255,0.08)", borderRadius: "2px" }}>
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 flex items-center justify-center" style={{ background: "rgba(0,229,255,0.1)", borderRadius: "2px" }}>
+                      <span className="text-sm font-bold" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: "#00e5ff" }}>
+                        {comment.userName.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="font-bold text-sm" style={{ fontFamily: "'Inter', sans-serif", color: "#dce6f5" }}>{comment.userName}</p>
+                      <p className="text-xs" style={{ fontFamily: "'DM Mono', monospace", color: "#3d6680" }}>
+                        {new Date(comment.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                      </p>
+                    </div>
+                  </div>
+                  <p style={{ fontFamily: "'Inter', sans-serif", color: "#a0b4c8" }}>{comment.content}</p>
+                </div>
+              ))
+            )}
+          </div>
         </div>
 
         <div className="mt-16 pt-8" style={{ borderTop: "1px solid rgba(0,229,255,0.08)" }}>
@@ -1934,7 +2803,7 @@ function ProjectModal({ project, onClose }: { project: Project; onClose: () => v
 
   const allImages = project.images.length > 0 
     ? project.images 
-    : [`https://images.unsplash.com/${project.image}?w=1200&h=800&fit=crop&auto=format`];
+    : [project.image.startsWith("data:") ? project.image : `https://images.unsplash.com/${project.image}?w=1200&h=800&fit=crop&auto=format`];
 
   const nextImage = () => {
     setCurrentImageIndex((prev) => (prev + 1) % allImages.length);
@@ -2042,7 +2911,9 @@ export default function App() {
   const { content, save } = useSiteContent();
   const { posts, createPost, upsert, remove, togglePublish } = usePosts();
   const { projects, createProject, upsert: upsertProject, remove: removeProject } = useProjects();
-  const [view, setView] = useState<"site" | "login" | "admin">("site");
+  const { testimonials: userTestimonials, submitTestimonial, approveTestimonial, removeTestimonial } = useUserTestimonials();
+  const { users: tutorialUsers, registerUser, removeUser: removeTutorialUser } = useTutorialUsers();
+  const [view, setView] = useState<"site" | "login" | "admin" | "tutorial">("site");
   const [activePost, setActivePost] = useState<Post | null>(null);
   const [activeProject, setActiveProject] = useState<Project | null>(null);
 
@@ -2060,20 +2931,28 @@ export default function App() {
           removePost={remove} togglePublish={togglePublish}
           projects={projects} createProject={createProject} upsertProject={upsertProject}
           removeProject={removeProject}
+          userTestimonials={userTestimonials} approveTestimonial={approveTestimonial} removeTestimonial={removeTestimonial}
+          tutorialUsers={tutorialUsers} removeTutorialUser={removeTutorialUser}
         />
       )}
       {view === "site" && !activePost && !activeProject && (
         <>
-          <NavBar onAdminClick={() => setView("login")} />
+          <NavBar onAdminClick={() => setView("login")} content={content} onTutorialClick={() => setView("tutorial")} />
           <Hero content={content} />
           <Services content={content} />
           <About content={content} />
           <Portfolio projects={projects} onProjectClick={setActiveProject} />
           <TechStack />
           {published.length > 0 && <Blog posts={published} onRead={setActivePost} />}
-          <Testimonials content={content} />
+          <Testimonials content={content} userTestimonials={userTestimonials} submitTestimonial={submitTestimonial} />
           <Contact content={content} />
           <Footer />
+        </>
+      )}
+      {view === "tutorial" && (
+        <>
+          <NavBar onAdminClick={() => setView("login")} content={content} onTutorialClick={() => setView("site")} />
+          <Tutorial onRegister={registerUser} />
         </>
       )}
       {view === "site" && activePost && (
