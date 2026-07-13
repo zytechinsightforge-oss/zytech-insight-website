@@ -8,6 +8,24 @@ import {
   Clock, Users,
 } from "lucide-react";
 
+// Helper function to upload images to R2
+async function uploadImage(file: File): Promise<string> {
+  const formData = new FormData();
+  formData.append("file", file);
+  
+  const res = await fetch("/api/upload", {
+    method: "POST",
+    body: formData,
+  });
+  
+  if (!res.ok) {
+    throw new Error("Failed to upload image");
+  }
+  
+  const data = await res.json();
+  return data.url;
+}
+
 // ─── Default site content (editable via admin) ───────────────────────────────
 
 const DEFAULT_CONTENT = {
@@ -195,37 +213,39 @@ const DEFAULT_PROJECTS: Project[] = [
 ];
 
 function useProjects() {
-  const [projects, setProjects] = useState<Project[]>(() => {
-    try {
-      const saved = localStorage.getItem("zif_projects");
-      if (!saved) {
-        return DEFAULT_PROJECTS;
-      }
-      const parsed = JSON.parse(saved);
-      if (!Array.isArray(parsed) || parsed.length === 0) {
-        return DEFAULT_PROJECTS;
-      }
-      return parsed.map((p: any) => ({
-        id: p.id || Date.now().toString(),
-        title: p.title || "New Project",
-        category: p.category || "Web App",
-        desc: p.desc || "Project description...",
-        tech: p.tech || ["React"],
-        image: p.image || "photo-1611974789855-9c2a0a7236a3",
-        color: p.color || "#00e5ff",
-        images: p.images || [],
-        details: p.details || "More details about the project...",
-        backgroundImage: p.backgroundImage || "",
-        demoUrl: p.demoUrl || "",
-      }));
-    } catch { 
-      return DEFAULT_PROJECTS; 
-    }
-  });
+  const [projects, setProjects] = useState<Project[]>(DEFAULT_PROJECTS);
+  const [loading, setLoading] = useState(true);
 
-  const saveProjects = (next: Project[]) => {
+  useEffect(() => {
+    async function fetchProjects() {
+      try {
+        const res = await fetch("/api/projects");
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.length > 0) {
+            setProjects(data);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to fetch projects:", e);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchProjects();
+  }, []);
+
+  const saveProjects = async (next: Project[]) => {
     setProjects(next);
-    localStorage.setItem("zif_projects", JSON.stringify(next));
+    try {
+      await fetch("/api/projects", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(next),
+      });
+    } catch (e) {
+      console.error("Failed to save projects:", e);
+    }
   };
 
   const createProject = (): Project => ({
@@ -248,7 +268,7 @@ function useProjects() {
 
   const remove = (id: string) => saveProjects(projects.filter((p) => p.id !== id));
 
-  return { projects, createProject, upsert, remove };
+  return { projects, createProject, upsert, remove, loading };
 }
 
 const TECH_STACK = [
@@ -272,34 +292,76 @@ function useScrollY() {
 }
 
 function useSiteContent() {
-  const [content, setContent] = useState(() => {
-    try {
-      const saved = localStorage.getItem("zif_content");
-      return saved ? JSON.parse(saved) : DEFAULT_CONTENT;
-    } catch {
-      return DEFAULT_CONTENT;
-    }
-  });
+  const [content, setContent] = useState(DEFAULT_CONTENT);
+  const [loading, setLoading] = useState(true);
 
-  const save = (next: typeof DEFAULT_CONTENT) => {
+  // Fetch content on mount
+  useEffect(() => {
+    async function fetchContent() {
+      try {
+        const res = await fetch("/api/content");
+        if (res.ok) {
+          const data = await res.json();
+          setContent(data);
+        }
+      } catch (e) {
+        // Fall back to default if API fails
+        console.error("Failed to fetch content:", e);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchContent();
+  }, []);
+
+  const save = async (next: typeof DEFAULT_CONTENT) => {
     setContent(next);
-    localStorage.setItem("zif_content", JSON.stringify(next));
+    try {
+      await fetch("/api/content", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(next),
+      });
+    } catch (e) {
+      console.error("Failed to save content:", e);
+    }
   };
 
-  return { content, save };
+  return { content, save, loading };
 }
 
 function usePosts() {
-  const [posts, setPosts] = useState<Post[]>(() => {
-    try {
-      const saved = localStorage.getItem("zif_posts");
-      return saved ? JSON.parse(saved).map((p: any) => ({ gallery: [], backgroundImage: "", ...p })) : [];
-    } catch { return []; }
-  });
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const savePosts = (next: Post[]) => {
+  useEffect(() => {
+    async function fetchPosts() {
+      try {
+        const res = await fetch("/api/posts");
+        if (res.ok) {
+          const data = await res.json();
+          setPosts(data);
+        }
+      } catch (e) {
+        console.error("Failed to fetch posts:", e);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchPosts();
+  }, []);
+
+  const savePosts = async (next: Post[]) => {
     setPosts(next);
-    localStorage.setItem("zif_posts", JSON.stringify(next));
+    try {
+      await fetch("/api/posts", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(next),
+      });
+    } catch (e) {
+      console.error("Failed to save posts:", e);
+    }
   };
 
   const createPost = (): Post => ({
@@ -327,7 +389,7 @@ function usePosts() {
     savePosts(posts.map((p) => p.id === id ? { ...p, published: !p.published, updatedAt: new Date().toISOString() } : p));
   };
 
-  return { posts, createPost, upsert, remove, togglePublish };
+  return { posts, createPost, upsert, remove, togglePublish, loading };
 }
 
 // ─── Testimonials & Tutorial Hooks ──────────────────────────────────────────

@@ -1,0 +1,19 @@
+#:schema node_modules/wrangler/config-schema.json
+name = "zytech-insight-website"
+compatibility_date = "2024-04-01"
+
+# Pages Functions configuration
+[vars]
+# Add any environment variables here (e.g., API keys)
+
+# KV Namespace for site data
+kv_namespaces = [
+  { binding = "ZYTECH_DATA", id = "YOUR_KV_NAMESPACE_ID", preview_id = "YOUR_PREVIEW_KV_NAMESPACE_ID" }
+]
+
+# R2 Bucket for storing images
+[[r2_buckets]]
+binding = "ZYTECH_IMAGES"
+bucket_name = "YOUR_R2_BUCKET_NAME"
+preview_bucket_name = "YOUR_PREVIEW_R2_BUCKET_NAME"
+
