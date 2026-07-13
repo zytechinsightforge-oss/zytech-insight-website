@@ -1641,7 +1641,7 @@ function AdminField({ label, value, onChange, multiline = false }: { label: stri
 
 // ─── Public Site Components ───────────────────────────────────────────────────
 
-function NavBar({ onAdminClick, content }: { onAdminClick: () => void; content: any }) {
+function NavBar({ onAdminClick, content, onTutorialClick }: { onAdminClick: () => void; content: any; onTutorialClick?: () => void }) {
   const [open, setOpen] = useState(false);
   const scrollY = useScrollY();
   const scrolled = scrollY > 40;
@@ -1674,12 +1674,21 @@ function NavBar({ onAdminClick, content }: { onAdminClick: () => void; content: 
 
         <div className="hidden md:flex items-center gap-6">
           {NAV_LINKS.map((l) => (
-            <a key={l.label} href={l.href} className="text-sm font-medium transition-colors duration-200"
-              style={{ fontFamily: "'Inter', sans-serif", color: "#5e7499" }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = "#dce6f5")}
-              onMouseLeave={(e) => (e.currentTarget.style.color = "#5e7499")}>
-              {l.label}
-            </a>
+            l.id === "tutorials" ? (
+              <button key={l.label} onClick={onTutorialClick} className="text-sm font-medium transition-colors duration-200"
+                style={{ fontFamily: "'Inter', sans-serif", color: "#5e7499", background: "transparent", border: "none", cursor: "pointer" }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = "#dce6f5")}
+                onMouseLeave={(e) => (e.currentTarget.style.color = "#5e7499")}>
+                {l.label}
+              </button>
+            ) : (
+              <a key={l.label} href={l.href} className="text-sm font-medium transition-colors duration-200"
+                style={{ fontFamily: "'Inter', sans-serif", color: "#5e7499" }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = "#dce6f5")}
+                onMouseLeave={(e) => (e.currentTarget.style.color = "#5e7499")}>
+                {l.label}
+              </a>
+            )
           ))}
           {/* Google Custom Search */}
           <div className="gcse-search" style={{ width: "200px" }}></div>
@@ -1707,9 +1716,16 @@ function NavBar({ onAdminClick, content }: { onAdminClick: () => void; content: 
         <div className="md:hidden px-6 pb-6 pt-2 flex flex-col gap-4"
           style={{ background: "rgba(7,11,19,0.98)", borderTop: "1px solid rgba(0,229,255,0.08)" }}>
           {NAV_LINKS.map((l) => (
-            <a key={l.label} href={l.href} className="text-base font-medium py-1"
-              style={{ fontFamily: "'Inter', sans-serif", color: "#dce6f5" }}
-              onClick={() => setOpen(false)}>{l.label}</a>
+            l.id === "tutorials" ? (
+              <button key={l.label} onClick={() => { onTutorialClick?.(); setOpen(false); }} className="text-base font-medium py-1 text-left"
+                style={{ fontFamily: "'Inter', sans-serif", color: "#dce6f5", background: "transparent", border: "none", cursor: "pointer" }}>
+                {l.label}
+              </button>
+            ) : (
+              <a key={l.label} href={l.href} className="text-base font-medium py-1"
+                style={{ fontFamily: "'Inter', sans-serif", color: "#dce6f5" }}
+                onClick={() => setOpen(false)}>{l.label}</a>
+            )
           ))}
           <a href="#contact" className="text-center px-5 py-3 text-sm font-semibold mt-2"
             style={{ background: "#00e5ff", color: "#070b13", borderRadius: "2px", fontFamily: "'Barlow', sans-serif" }}
@@ -2986,6 +3002,8 @@ export default function App() {
   const { projects, createProject, upsert: upsertProject, remove: removeProject } = useProjects();
   const { testimonials: userTestimonials, submitTestimonial, approveTestimonial, removeTestimonial } = useUserTestimonials();
   const { users: registeredUsers, registerUser, removeUser: removeRegisteredUser } = useRegisteredUsers();
+  const { messages, sendMessage, markAsRead: markMessageAsRead, removeMessage } = useMessages();
+  const { comments, addComment, approveComment, removeComment } = useComments();
   const [view, setView] = useState<"site" | "login" | "admin" | "tutorial">("site");
   const [activePost, setActivePost] = useState<Post | null>(null);
   const [activeProject, setActiveProject] = useState<Project | null>(null);
@@ -3006,6 +3024,8 @@ export default function App() {
           removeProject={removeProject}
           userTestimonials={userTestimonials} approveTestimonial={approveTestimonial} removeTestimonial={removeTestimonial}
           registeredUsers={registeredUsers} removeRegisteredUser={removeRegisteredUser}
+          messages={messages} markMessageAsRead={markMessageAsRead} removeMessage={removeMessage}
+          comments={comments} approveComment={approveComment} removeComment={removeComment}
         />
       )}
       {view === "site" && !activePost && !activeProject && (
@@ -3018,7 +3038,7 @@ export default function App() {
           <TechStack />
           {published.length > 0 && <Blog posts={published} onRead={setActivePost} />}
           <Testimonials content={content} userTestimonials={userTestimonials} submitTestimonial={submitTestimonial} />
-          <Contact content={content} />
+          <Contact content={content} onSendMessage={sendMessage} />
           <Footer />
         </>
       )}
@@ -3029,7 +3049,13 @@ export default function App() {
         </>
       )}
       {view === "site" && activePost && (
-        <PostView post={activePost} onBack={() => setActivePost(null)} />
+        <PostView 
+          post={activePost} 
+          onBack={() => setActivePost(null)} 
+          comments={comments} 
+          onAddComment={addComment}
+          currentUser={registeredUsers.length > 0 ? registeredUsers[0] : null}
+        />
       )}
       {view === "site" && activeProject && (
         <ProjectModal project={activeProject} onClose={() => setActiveProject(null)} />
