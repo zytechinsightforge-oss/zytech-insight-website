@@ -2496,7 +2496,14 @@ function Footer() {
           </div>
         </div>
         <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-8" style={{ borderTop: "1px solid rgba(0,229,255,0.06)" }}>
-          <span className="text-xs" style={{ fontFamily: "'DM Mono', monospace", color: "#1e3a52" }}>© 2024 ZyTech Insight Ltd. All rights reserved.</span>
+          <div className="flex items-center gap-4">
+            <img src="/cac-logo.png" alt="CAC Logo" className="h-12 w-auto object-contain" />
+            <div>
+              <span className="text-xs" style={{ fontFamily: "'DM Mono', monospace", color: "#1e3a52" }}>© 2024 ZyTech Insight Ltd. All rights reserved.</span>
+              <br />
+              <span className="text-xs" style={{ fontFamily: "'DM Mono', monospace", color: "#3d6680" }}>RC Number: 9532408 · Registered with Corporate Affairs Commission, Nigeria</span>
+            </div>
+          </div>
           <div className="flex gap-6">
             {["Privacy Policy", "Terms of Service"].map((l) => (
               <a key={l} href="#" className="text-xs transition-colors duration-200"
