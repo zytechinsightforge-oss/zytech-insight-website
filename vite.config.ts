@@ -30,6 +30,15 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  server: {
+    host: true, // Allow access from network
+    port: 5173,
+  },
+  preview: {
+    host: true,
+    port: 4173,
+  },
+  base: '/', // Set to your deployment path (use '/' for root domain like zytechapp.com)
 
   // File types to support raw imports. Never add .css, .tsx, or .ts files to this.
   assetsInclude: ['**/*.svg', '**/*.csv'],

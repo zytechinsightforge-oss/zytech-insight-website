@@ -5,7 +5,7 @@ import {
   Linkedin, Twitter, Github, CheckCircle, Settings, Lock,
   LogOut, Save, Plus, Trash2, Eye, MessageCircle, FileText,
   Image as ImageIcon, Images, Calendar, Tag, Send, EyeOff, ChevronRight,
-  Clock,
+  Clock, Users,
 } from "lucide-react";
 
 // ─── Default site content (editable via admin) ───────────────────────────────
@@ -149,6 +149,7 @@ interface Project {
   images: string[];
   details: string;
   backgroundImage: string;
+  demoUrl: string; // New field for demo URL
 }
 
 const DEFAULT_PROJECTS: Project[] = [
@@ -163,6 +164,7 @@ const DEFAULT_PROJECTS: Project[] = [
     images: [],
     details: "Built for high-frequency trading firms, this platform processes millions of events per second with millisecond precision. Features real-time dashboards, historical analytics, and automated reporting.",
     backgroundImage: "",
+    demoUrl: "https://example.com",
   },
   {
     id: "2",
@@ -175,6 +177,7 @@ const DEFAULT_PROJECTS: Project[] = [
     images: [],
     details: "A comprehensive EHR system with patient management, appointment scheduling, billing, and telemedicine features. Fully HIPAA and GDPR compliant with end-to-end encryption.",
     backgroundImage: "",
+    demoUrl: "",
   },
   {
     id: "3",
@@ -187,6 +190,7 @@ const DEFAULT_PROJECTS: Project[] = [
     images: [],
     details: "Uses machine learning to optimize delivery routes in real-time, considering traffic, weather, and vehicle constraints. Reduced operational costs by 23% in the first year of deployment.",
     backgroundImage: "",
+    demoUrl: "",
   },
 ];
 
@@ -212,6 +216,7 @@ function useProjects() {
         images: p.images || [],
         details: p.details || "More details about the project...",
         backgroundImage: p.backgroundImage || "",
+        demoUrl: p.demoUrl || "",
       }));
     } catch { 
       return DEFAULT_PROJECTS; 
@@ -234,6 +239,7 @@ function useProjects() {
     images: [],
     details: "More details about the project...",
     backgroundImage: "",
+    demoUrl: "",
   });
 
   const upsert = (project: Project) => {
@@ -1462,6 +1468,13 @@ function ProjectEditor({ project, onSave, onCancel }: { project: Project; onSave
               className="w-full px-4 py-3 text-sm outline-none resize-y"
               style={{ background: "#0d1525", border: "1px solid rgba(0,229,255,0.1)", borderRadius: "2px", color: "#dce6f5", fontFamily: "'Inter', sans-serif", lineHeight: "1.8", minHeight: "200px" }} />
           </div>
+          <div>
+            <label className="block text-xs mb-2 tracking-widest uppercase" style={{ fontFamily: "'DM Mono', monospace", color: "#3d6680" }}>Demo URL (for testing app)</label>
+            <input type="url" value={draft.demoUrl} onChange={(e) => set("demoUrl", e.target.value)}
+              className="w-full px-4 py-3 text-sm outline-none"
+              style={{ background: "#0d1525", border: "1px solid rgba(0,229,255,0.1)", borderRadius: "2px", color: "#dce6f5", fontFamily: "'Inter', sans-serif" }}
+              placeholder="https://your-demo-app.com" />
+          </div>
         </div>
 
         {/* Sidebar */}
@@ -1918,6 +1931,15 @@ function Portfolio({ projects, onProjectClick }: { projects: Project[]; onProjec
                 style={{ filter: "brightness(0.25) saturate(0.5)" }} />
               <div className="absolute inset-0 transition-opacity duration-500"
                 style={{ background: `linear-gradient(to top, ${p.color}22 0%, transparent 60%)`, opacity: active === i ? 1 : 0 }} />
+              {/* Demo Badge */}
+              {p.demoUrl && (
+                <div className="absolute top-6 left-6 z-10">
+                  <span className="text-xs px-3 py-1 font-bold"
+                    style={{ fontFamily: "'DM Mono', monospace", color: "#070b13", background: "#00e5ff", borderRadius: "2px" }}>
+                    LIVE DEMO
+                  </span>
+                </div>
+              )}
               <div className="relative p-8 h-full flex flex-col justify-end" style={{ minHeight: "400px" }}>
                 <div className="text-xs tracking-widest mb-3" style={{ fontFamily: "'DM Mono', monospace", color: p.color, opacity: 0.8 }}>{p.category}</div>
                 <h3 className="text-2xl font-black mb-3" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: "#dce6f5" }}>{p.title}</h3>
@@ -2801,6 +2823,7 @@ function PostView({
 function ProjectModal({ project, onClose }: { project: Project; onClose: () => void }) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isOverviewExpanded, setIsOverviewExpanded] = useState(false);
+  const [showDemo, setShowDemo] = useState(false); // State to toggle demo iframe
   const CHARACTER_LIMIT = 200;
 
   const allImages = project.images.length > 0 
@@ -2845,64 +2868,112 @@ function ProjectModal({ project, onClose }: { project: Project; onClose: () => v
           </button>
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-8 p-6">
-          {/* Slideshow */}
-          <div className="relative">
-            <div className="aspect-video overflow-hidden" style={{ borderRadius: "2px" }}>
-              <img src={allImages[currentImageIndex]} alt="" className="w-full h-full object-cover" />
-            </div>
-            {allImages.length > 1 && (
-              <>
-                <button onClick={prevImage} className="absolute left-4 top-1/2 -translate-y-1/2 p-3" style={{ background: "rgba(7,11,19,0.8)", color: "#00e5ff", borderRadius: "2px" }}>
-                  <ChevronRight size={20} style={{ transform: "rotate(180deg)" }} />
-                </button>
-                <button onClick={nextImage} className="absolute right-4 top-1/2 -translate-y-1/2 p-3" style={{ background: "rgba(7,11,19,0.8)", color: "#00e5ff", borderRadius: "2px" }}>
-                  <ChevronRight size={20} />
-                </button>
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
-                  {allImages.map((_, i) => (
-                    <button key={i} onClick={() => setCurrentImageIndex(i)} className="w-2 h-2 rounded-full" style={{ background: i === currentImageIndex ? "#00e5ff" : "#3d6680" }} />
-                  ))}
+        <div className="p-6 space-y-6">
+          {/* If we have a demo URL and are showing it */}
+          {showDemo && project.demoUrl ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold" style={{ fontFamily: "'DM Mono', monospace", color: "#3d6680" }}>Live Demo</h3>
+                <div className="flex gap-2">
+                  <a 
+                    href={project.demoUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="px-4 py-2 text-xs font-bold"
+                    style={{ background: "transparent", color: "#00e5ff", border: "1px solid rgba(0,229,255,0.3)", borderRadius: "2px", fontFamily: "'Barlow', sans-serif" }}
+                  >
+                    Open in New Tab
+                  </a>
+                  <button 
+                    onClick={() => setShowDemo(false)}
+                    className="px-4 py-2 text-xs font-bold"
+                    style={{ background: "transparent", color: "#ef4444", border: "1px solid rgba(239,68,68,0.3)", borderRadius: "2px", fontFamily: "'Barlow', sans-serif" }}
+                  >
+                    Close Demo
+                  </button>
                 </div>
-              </>
-            )}
-          </div>
-
-          {/* Details */}
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-sm font-bold mb-2" style={{ fontFamily: "'DM Mono', monospace", color: "#3d6680" }}>Overview</h3>
-              <p style={{ fontFamily: "'Inter', sans-serif", color: "#a0b4c8", lineHeight: "1.8" }}>{displayText}</p>
-              {shouldTruncate && (
-                <button 
-                  onClick={() => setIsOverviewExpanded(!isOverviewExpanded)}
-                  className="mt-2 text-sm font-bold transition-colors duration-200"
-                  style={{ fontFamily: "'Barlow', sans-serif", color: "#00e5ff" }}
-                >
-                  {isOverviewExpanded ? "Read less" : "Read more"}
-                </button>
-              )}
-            </div>
-            
-            <div>
-              <h3 className="text-sm font-bold mb-3" style={{ fontFamily: "'DM Mono', monospace", color: "#3d6680" }}>Technologies Used</h3>
-              <div className="flex flex-wrap gap-2">
-                {project.tech.map((t) => (
-                  <span key={t} className="text-xs px-3 py-1.5"
-                    style={{ fontFamily: "'DM Mono', monospace", color: project.color, border: `1px solid ${project.color}33`, borderRadius: "2px", background: `${project.color}0a` }}>
-                    {t}
-                  </span>
-                ))}
+              </div>
+              <div className="aspect-video overflow-hidden" style={{ borderRadius: "2px", border: "1px solid rgba(0,229,255,0.1)" }}>
+                <iframe 
+                  src={project.demoUrl} 
+                  title={`${project.title} Demo`}
+                  className="w-full h-full"
+                  style={{ border: "none" }}
+                  allowFullScreen
+                />
               </div>
             </div>
+          ) : (
+            // Original content (slideshow + details)
+            <div className="grid lg:grid-cols-2 gap-8">
+              {/* Slideshow */}
+              <div className="relative">
+                <div className="aspect-video overflow-hidden" style={{ borderRadius: "2px" }}>
+                  <img src={allImages[currentImageIndex]} alt="" className="w-full h-full object-cover" />
+                </div>
+                {allImages.length > 1 && (
+                  <>
+                    <button onClick={prevImage} className="absolute left-4 top-1/2 -translate-y-1/2 p-3" style={{ background: "rgba(7,11,19,0.8)", color: "#00e5ff", borderRadius: "2px" }}>
+                      <ChevronRight size={20} style={{ transform: "rotate(180deg)" }} />
+                    </button>
+                    <button onClick={nextImage} className="absolute right-4 top-1/2 -translate-y-1/2 p-3" style={{ background: "rgba(7,11,19,0.8)", color: "#00e5ff", borderRadius: "2px" }}>
+                      <ChevronRight size={20} />
+                    </button>
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+                      {allImages.map((_, i) => (
+                        <button key={i} onClick={() => setCurrentImageIndex(i)} className="w-2 h-2 rounded-full" style={{ background: i === currentImageIndex ? "#00e5ff" : "#3d6680" }} />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
 
-            <div>
-              <a href="#contact" onClick={onClose} className="inline-flex items-center gap-2 px-6 py-3 text-sm font-bold"
-                style={{ background: project.color, color: "#070b13", borderRadius: "2px", fontFamily: "'Barlow', sans-serif" }}>
-                Discuss Similar Project <ArrowRight size={16} />
-              </a>
+              {/* Details */}
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-sm font-bold mb-2" style={{ fontFamily: "'DM Mono', monospace", color: "#3d6680" }}>Overview</h3>
+                  <p style={{ fontFamily: "'Inter', sans-serif", color: "#a0b4c8", lineHeight: "1.8" }}>{displayText}</p>
+                  {shouldTruncate && (
+                    <button 
+                      onClick={() => setIsOverviewExpanded(!isOverviewExpanded)}
+                      className="mt-2 text-sm font-bold transition-colors duration-200"
+                      style={{ fontFamily: "'Barlow', sans-serif", color: "#00e5ff" }}
+                    >
+                      {isOverviewExpanded ? "Read less" : "Read more"}
+                    </button>
+                  )}
+                </div>
+                
+                <div>
+                  <h3 className="text-sm font-bold mb-3" style={{ fontFamily: "'DM Mono', monospace", color: "#3d6680" }}>Technologies Used</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {project.tech.map((t) => (
+                      <span key={t} className="text-xs px-3 py-1.5"
+                        style={{ fontFamily: "'DM Mono', monospace", color: project.color, border: `1px solid ${project.color}33`, borderRadius: "2px", background: `${project.color}0a` }}>
+                        {t}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-3">
+                  {project.demoUrl && (
+                    <button 
+                      onClick={() => setShowDemo(true)}
+                      className="inline-flex items-center gap-2 px-6 py-3 text-sm font-bold"
+                      style={{ background: project.color, color: "#070b13", borderRadius: "2px", fontFamily: "'Barlow', sans-serif" }}
+                    >
+                      View Live Demo <ArrowRight size={16} />
+                    </button>
+                  )}
+                  <a href="#contact" onClick={onClose} className="inline-flex items-center gap-2 px-6 py-3 text-sm font-bold"
+                    style={{ background: "transparent", color: "#dce6f5", border: `1px solid ${project.color}33`, borderRadius: "2px", fontFamily: "'Barlow', sans-serif" }}>
+                    Discuss Similar Project
+                  </a>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>
@@ -2914,7 +2985,7 @@ export default function App() {
   const { posts, createPost, upsert, remove, togglePublish } = usePosts();
   const { projects, createProject, upsert: upsertProject, remove: removeProject } = useProjects();
   const { testimonials: userTestimonials, submitTestimonial, approveTestimonial, removeTestimonial } = useUserTestimonials();
-  const { users: tutorialUsers, registerUser, removeUser: removeTutorialUser } = useTutorialUsers();
+  const { users: registeredUsers, registerUser, removeUser: removeRegisteredUser } = useRegisteredUsers();
   const [view, setView] = useState<"site" | "login" | "admin" | "tutorial">("site");
   const [activePost, setActivePost] = useState<Post | null>(null);
   const [activeProject, setActiveProject] = useState<Project | null>(null);
@@ -2934,7 +3005,7 @@ export default function App() {
           projects={projects} createProject={createProject} upsertProject={upsertProject}
           removeProject={removeProject}
           userTestimonials={userTestimonials} approveTestimonial={approveTestimonial} removeTestimonial={removeTestimonial}
-          tutorialUsers={tutorialUsers} removeTutorialUser={removeTutorialUser}
+          registeredUsers={registeredUsers} removeRegisteredUser={removeRegisteredUser}
         />
       )}
       {view === "site" && !activePost && !activeProject && (
